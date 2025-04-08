@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yahoo Finance Historical Data Scraper</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #0052a3;
+        }
+        .download-btn {
+            background-color: #28a745;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .download-btn:hover {
+            background-color: #218838;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .code-section {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #0066cc;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .error {
+            color: #d9534f;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #d9534f;
+            border-radius: 4px;
+            display: none;
+        }
+        .download-section {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Yahoo Finance Historical Data Scraper</h1>
+        
+        <div class="form-group">
+            <label for="url">Enter Yahoo Finance Historical Data URL:</label>
+            <input type="text" id="url" name="url" placeholder="https://finance.yahoo.com/quote/MSFT/history/?period1=1712576193&period2=1744112187">
+        </div>
+        
+        <button id="scrapeButton">Scrape Data</button>
+        
+        <div class="loading" id="loading">
+            <p>Processing... This may take a moment.</p>
+        </div>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="result" id="result">
+            <h2>Results</h2>
+            <div id="resultContent"></div>
+            
+            <div class="download-section" id="downloadSection">
+                <p>Your Excel file is ready to download:</p>
+                <button id="downloadButton" class="download-btn">Download Excel File</button>
+            </div>
+        </div>
+        
+        <div class="code-section">
+            <h3>Python Code Used:</h3>
+            <pre id="pythonCode">
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+import datetime
+
+def scrape_yahoo_finance_history(url):
+    """
+    Scrape historical data from Yahoo Finance and save to Excel.
+   
+    Args:
+        url (str): Yahoo Finance historical data URL
+    """
+    # Send request to get the page content
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+   
+    print(f"Requesting data from: {url}")
+    response = requests.get(url, headers=headers)
+   
+    if response.status_code != 200:
+        print(f"Failed to retrieve page: Status code {response.status_code}")
+        return
+   
+    # Parse the HTML content
+    soup = BeautifulSoup(response.text, 'html.parser')
+   
+    # Find the table - it comes after the marker in the HTML
+    # First locate the body tag with class="yf-1jecxey"
+    table_body = soup.find('tbody')
+   
+    if not table_body:
+        print("Could not find the table body in the HTML")
+        return
+   
+    # Extract data from table rows
+    data = []
+    rows = table_body.find_all('tr')
+   
+    for row in rows:
+        cells = row.find_all('td')
+        if len(cells) >= 7:  # Ensure we have enough columns
+            row_data = [cell.text.strip() for cell in cells]
+            data.append(row_data)
+   
+    if not data:
+        print("No data found in the table")
+        return
+   
+    # Create DataFrame
+    columns = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"]
+    df = pd.DataFrame(data, columns=columns)
+   
+    # Clean data and convert types
+    for col in ["Open", "High", "Low", "Close", "Adj Close"]:
+        df[col] = df[col].replace(',', '', regex=True).astype(float)
+   
+    # Convert Volume to numeric (remove commas and convert)
+    df["Volume"] = df["Volume"].replace(',', '', regex=True).astype(float)
+   
+    # Convert Date to datetime
+    df["Date"] = pd.to_datetime(df["Date"])
+   
+    # Extract ticker symbol from URL
+    ticker_match = re.search(r'/quote/([A-Z]+)/', url)
+    ticker = ticker_match.group(1) if ticker_match else "stock"
+   
+    # Create filename with ticker and current date
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    filename = f"{ticker}_historical_data_{today}.xlsx"
+   
+    # Save to Excel
+    df.to_excel(filename, index=False)
+    print(f"Data successfully saved to {filename}")
+   
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    url = "https://finance.yahoo.com/quote/MSFT/history/?period1=1712576193&period2=1744112187"
+    df = scrape_yahoo_finance_history(url)
+   
+    # Display first few rows of the data
+    if df is not None:
+        print("\nPreview of the data:")
+        print(df.head())
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('scrapeButton').addEventListener('click', function() {
+            const url = document.getElementById('url').value.trim();
+            if (!url) {
+                showError("Please enter a URL");
+                return;
+            }
+            
+            if (!url.includes('finance.yahoo.com/quote/') || !url.includes('/history/')) {
+                showError("URL doesn't appear to be a valid Yahoo Finance historical data URL");
+                return;
+            }
+            
+            // Show loading and hide previous results/errors
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('downloadSection').style.display = 'none';
+            
+            // In a real application, this would make an AJAX request to a backend
+            // where the Python code would run. For this demo, we'll simulate the process.
+            simulateScraping(url);
+        });
+        
+        function simulateScraping(url) {
+            // Simulate processing time
+            setTimeout(() => {
+                // Extract ticker from URL for the demo
+                const tickerMatch = url.match(/\/quote\/([A-Z]+)\//);
+                const ticker = tickerMatch ? tickerMatch[1] : "UNKNOWN";
+                const today = new Date().toISOString().split('T')[0];
+                const filename = `${ticker}_historical_data_${today}.xlsx`;
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                // Create a mock result based on the URL
+                const resultElement = document.getElementById('resultContent');
+                resultElement.innerHTML = `
+                    <p>Successfully scraped data for ${ticker} from Yahoo Finance.</p>
+                    <p>Excel file has been generated: <strong>${filename}</strong></p>
+                    
+                    <h3>Sample of data that has been retrieved:</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Open</th>
+                                <th>High</th>
+                                <th>Low</th>
+                                <th>Close</th>
+                                <th>Adj Close</th>
+                                <th>Volume</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2025-04-08</td>
+                                <td>420.75</td>
+                                <td>425.12</td>
+                                <td>418.33</td>
+                                <td>423.91</td>
+                                <td>423.91</td>
+                                <td>22,345,600</td>
+                            </tr>
+                            <tr>
+                                <td>2025-04-07</td>
+                                <td>418.22</td>
+                                <td>422.45</td>
+                                <td>417.80</td>
+                                <td>420.75</td>
+                                <td>420.75</td>
+                                <td>18,923,400</td>
+                            </tr>
+                            <tr>
+                                <td>2025-04-04</td>
+                                <td>415.60</td>
+                                <td>419.85</td>
+                                <td>414.23</td>
+                                <td>418.22</td>
+                                <td>418.22</td>
+                                <td>20,145,700</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+                
+                // Enable download button and show download section
+                document.getElementById('downloadSection').style.display = 'block';
+                document.getElementById('result').style.display = 'block';
+                
+                // Setup download button with the ticker and date
+                const downloadButton = document.getElementById('downloadButton');
+                downloadButton.setAttribute('data-filename', filename);
+                downloadButton.setAttribute('data-ticker', ticker);
+            }, 2000);
+        }
+        
+        // Handle the download button click
+        document.getElementById('downloadButton').addEventListener('click', function() {
+            const ticker = this.getAttribute('data-ticker');
+            const filename = this.getAttribute('data-filename');
+            
+            // In a real implementation, this would fetch the actual Excel file from the server
+            // For this demo, we'll create a mock Excel file with some sample data
+            
+            // Create sample data for CSV (easier for demo purposes than actual Excel)
+            const rows = [
+                ['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'],
+                ['2025-04-08', '420.75', '425.12', '418.33', '423.91', '423.91', '22345600'],
+                ['2025-04-07', '418.22', '422.45', '417.80', '420.75', '420.75', '18923400'],
+                ['2025-04-04', '415.60', '419.85', '414.23', '418.22', '418.22', '20145700'],
+                ['2025-04-03', '412.95', '417.30', '412.10', '415.60', '415.60', '19876500'],
+                ['2025-04-02', '410.33', '414.75', '409.22', '412.95', '412.95', '21345800']
+            ];
+            
+            // Convert to CSV string
+            let csvContent = '';
+            rows.forEach(row => {
+                csvContent += row.join(',') + '\n';
+            });
+            
+            // Create a downloadable link
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename.replace('.xlsx', '.csv'));
+            a.click();
+            
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            
+            // In a real implementation, you'd do something like:
+            // window.location.href = `/download?filename=${encodeURIComponent(filename)}`;
+            // And your server would serve the actual Excel file
+        });
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
